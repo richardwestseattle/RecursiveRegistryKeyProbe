@@ -1,6 +1,6 @@
 ﻿#Declare a global arraylist to which the recursive function below can append values.
-$global:RegKeyFields = "KeyName","ValueName","Value";
-[System.Collections.ArrayList]$global:RegKeysArray  = $RegKeyFields;
+$RegKeyFields = "KeyName","ValueName","Value";
+[System.Collections.ArrayList]$RegKeysArray  = $RegKeyFields;
 
 #RegOpenInitialKey does not need to be a separate function, but for the sake of organizaiton, I have separated it from the main body of the script.
 Function RegOpenInitialKey($ComputerName, $RegPath)
@@ -26,7 +26,7 @@ Function RecursiveRegKey($Key)
                 $item | Add-Member -NotePropertyName "ValueName" -NotePropertyValue $value.ToString();
                 $item | Add-Member -NotePropertyName "Value" -NotePropertyValue $Key.GetValue($value);
                 $RegKeysArray.Add($item);
-            }        
+            }
         }
     }
     else
@@ -41,7 +41,7 @@ Function RecursiveRegKey($Key)
                     $item | Add-Member -NotePropertyName "ValueName" -NotePropertyValue $value.ToString();
                     $item | Add-Member -NotePropertyName "Value" -NotePropertyValue $Key.GetValue($value);
                     $RegKeysArray.Add($item);
-                }     
+                }
             }
         }
         #Recursive lookup happens here. If the key has subkeys, send the key(s) back to this same function.
