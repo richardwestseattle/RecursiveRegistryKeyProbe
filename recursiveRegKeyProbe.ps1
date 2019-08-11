@@ -1,62 +1,116 @@
-﻿#Declare a global arraylist to which the recursive function below can append values.
-$RegKeyFields = "KeyName","ValueName","Value";
-[System.Collections.ArrayList]$RegKeysArray  = $RegKeyFields;
+<#PSScriptInfo
+ 
+.VERSION 1.0.0
+ 
+.GUID 
+ 
+.AUTHOR Richard West
+ 
+.COMPANYNAME
+ 
+.COPYRIGHT
+ 
+.TAGS
+ 
+.LICENSEURI
+ 
+.PROJECTURI 'https://github.com/richardwestseattle/RecursiveRegistryKeyProbe'
+ 
+.ICONURI
+ 
+.EXTERNALMODULEDEPENDENCIES
+ 
+.REQUIREDSCRIPTS
+ 
+.EXTERNALSCRIPTDEPENDENCIES
+ 
+.RELEASENOTES
+ 
+ 
+#>
 
-#RegOpenInitialKey does not need to be a separate function, but for the sake of organizaiton, I have separated it from the main body of the script.
-Function RegOpenInitialKey($ComputerName, $RegPath)
+<#
+ 
+.DESCRIPTION
+ Recursively probe registry key's sub-key's and values and output a sorted array.
+ 
+#> 
+
+Function RecursiveRegKey()
 {
+    param
+        (
+        [Parameter(Mandatory=$true)]
+        [String]$ComputerName,
+
+        [Parameter(Mandatory=$true)]
+        [String]$RegPath
+        )
+
+    #Declare an arraylist to which the recursive function below can append values.
+    $RegKeyFields = "KeyName","ValueName","Value";
+    [System.Collections.ArrayList]$RegKeysArray  = $RegKeyFields;
+
     $Reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $ComputerName)
     $RegKey= $Reg.OpenSubKey($RegPath);
-    RecursiveRegKey -Key $RegKey
 
-    $Reg.Close();
-}
-
-Function RecursiveRegKey($Key)
-{
-    #If it has no subkeys, retrieve the values and append to them to the global array. 
-    if($Key.SubKeyCount-eq 0)
+    Function DigThroughKeys()
     {
-        Foreach($value in $Key.GetValueNames())
-        {
-            if($Key.GetValue($value) -ne $null)
-            {
-                $item = New-Object psobject;
-                $item | Add-Member -NotePropertyName "KeyName" -NotePropertyValue $Key.Name;
-                $item | Add-Member -NotePropertyName "ValueName" -NotePropertyValue $value.ToString();
-                $item | Add-Member -NotePropertyName "Value" -NotePropertyValue $Key.GetValue($value);
-                $RegKeysArray.Add($item);
-            }
-        }
-    }
-    else
-    {   if($Key.ValueCount -gt 0)
+        param (
+
+            [Parameter(Mandatory=$true)]
+            [AllowNull()]
+            [AllowEmptyString()]
+            [Microsoft.Win32.RegistryKey]$Key
+            )
+
+        #If it has no subkeys, retrieve the values and append to them to the global array. 
+        if($Key.SubKeyCount-eq 0)
         {
             Foreach($value in $Key.GetValueNames())
             {
-                if($Key.GetValue($value) -ne $null)
+                if($null -ne $Key.GetValue($value))
                 {
-                    $item = New-Object PSObject;
+                    $item = New-Object psobject;
                     $item | Add-Member -NotePropertyName "KeyName" -NotePropertyValue $Key.Name;
                     $item | Add-Member -NotePropertyName "ValueName" -NotePropertyValue $value.ToString();
                     $item | Add-Member -NotePropertyName "Value" -NotePropertyValue $Key.GetValue($value);
-                    $RegKeysArray.Add($item);
+                    [void]$RegKeysArray.Add($item);
                 }
             }
         }
-        #Recursive lookup happens here. If the key has subkeys, send the key(s) back to this same function.
-        if($Key.SubKeyCount -gt 0)
+        else
         {
-            ForEach($subKey in $Key.GetSubKeyNames())
+            if($Key.ValueCount -gt 0)
             {
-                RecursiveRegKey -Key $Key.OpenSubKey($subKey);
+                Foreach($value in $Key.GetValueNames())
+                {
+                    if($null -ne $Key.GetValue($value))
+                    {
+                        $item = New-Object PSObject;
+                        $item | Add-Member -NotePropertyName "KeyName" -NotePropertyValue $Key.Name;
+                        $item | Add-Member -NotePropertyName "ValueName" -NotePropertyValue $value.ToString();
+                        $item | Add-Member -NotePropertyName "Value" -NotePropertyValue $Key.GetValue($value);
+                        [void]$RegKeysArray.Add($item);
+                    }
+                }
+            }
+            #Recursive lookup happens here. If the key has subkeys, send the key(s) back to this same function.
+            if($Key.SubKeyCount -gt 0)
+            {
+                ForEach($subKey in $Key.GetSubKeyNames())
+                {
+                    DigThroughKeys -Key $Key.OpenSubKey($subKey);
+                }
             }
         }
     }
+
+    #Replace the value following ComputerName to fit your needs. This works, and is most useful, when scanning remote computers.
+    DigThroughKeys -Key $RegKey
+
+    #Write the output to the console.
+    $RegKeysArray | Select-Object KeyName, ValueName, Value | Sort-Object ValueName | Format-Table
+
+    $Reg.Close();
 }
-
-#Replace the value following ComputerName to fit your needs. This works, and is most useful, when scanning remote computers.
-RegOpenInitialKey -ComputerName "$($env:computername)" -RegPath "HARDWARE\DESCRIPTION" | Out-Null
-
-#Write the output to the console.
-$RegKeysArray | Select-Object KeyName, ValueName, Value | Sort-Object ValueName | Format-Table
