@@ -49,7 +49,7 @@ Function RecursiveRegKey()
 
     #Declare an arraylist to which the recursive function below can append values.
     $RegKeyFields = "KeyName","ValueName","Value";
-    [System.Collections.ArrayList]$RegKeysArray  = $RegKeyFields;
+    [System.Collections.ArrayList]$global:RegKeysArray  = $RegKeyFields;
 
     $Reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $ComputerName)
     $RegKey= $Reg.OpenSubKey($RegPath);
